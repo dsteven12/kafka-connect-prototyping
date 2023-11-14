@@ -3,13 +3,16 @@ from numpy import add
 import pandas as pd
 
 
-df = pd.read_csv ('data.csv') 
+df = pd.read_csv('data.csv', encoding='ISO-8859-1')
 #print(df)
 
 # add a json column to the dataframe
 # splitlines will split the json into multiple rows not a single one
 df['json'] = df.to_json(orient='records', lines=True).splitlines()
 #print(df)
+
+# Replace the escaped forward slashes
+df['json'] = df['json'].str.replace(r'\/', '/')
 
 # just take the json column of the dataframe
 dfjson = df['json']

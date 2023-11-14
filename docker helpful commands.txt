@@ -1,4 +1,7 @@
 docker inspect document-streaming_spark_1 
+docker-compose -f docker-compose-kafka.yml up
+docker build -t api-ingest .
+docker run --rm --network document-streaming_default --name my-api-ingest -p 80:80 api-ingest
 
 
     links:

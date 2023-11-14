@@ -1,20 +1,10 @@
-# You need this to use FastAPI, work with statuses and be able to end HTTPExceptions
 from fastapi import FastAPI, status, HTTPException
- 
-# You need this to be able to turn classes into JSONs and return
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-
-# Needed for json.dumps
 import json
-
-# Both used for BaseModel
 from pydantic import BaseModel
-
 from datetime import datetime
-from kafka import KafkaProducer, producer
-
-
+from confluent_kafka import Producer
 
 # Create class (schema) for the JSON
 # Date get's ingested as string and then before writing validated
@@ -59,7 +49,7 @@ async def post_invoice_item(item: InvoiceItem): #body awaits a json with invoice
         print(json_as_string)
         
         # Produce the string
-        produce_kafka_string(json_as_string)
+        #produce_kafka_string(json_as_string)
 
         # Encode the created customer item if successful into a JSON and return it to the client with 201
         return JSONResponse(content=json_of_item, status_code=201)
@@ -70,10 +60,29 @@ async def post_invoice_item(item: InvoiceItem): #body awaits a json with invoice
         return JSONResponse(content=jsonable_encoder(item), status_code=400)
         
 
+def delivery_report(err, msg):
+    """ Called once for each message produced to indicate delivery result.
+        Triggered by poll() or flush(). """
+    if err is not None:
+        print('Message delivery failed: {}'.format(err))
+    else:
+        print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+
 def produce_kafka_string(json_as_string):
-    # Create producer
-        producer = KafkaProducer(bootstrap_servers='kafka:9092',acks=1)
+    # Configuration for Kafka Producer
+    conf = {
+        'bootstrap.servers': 'kafka:9092',
+        'acks': 'all'
+    }
+
+    producer = Producer(conf)
+
+    try:
+        # Produce the message and set the delivery report callback.
+        # The message will be delivered asynchronously.
+        producer.produce('ingestion-topic', json_as_string, callback=delivery_report)
         
-        # Write the string as bytes because Kafka needs it this way
-        producer.send('ingestion-topic', bytes(json_as_string, 'utf-8'))
-        producer.flush() 
+        # Wait for any outstanding messages to be delivered and delivery reports to be received.
+        producer.flush()
+    except Exception as e:
+        print(f"Failed to produce message: {e}")
